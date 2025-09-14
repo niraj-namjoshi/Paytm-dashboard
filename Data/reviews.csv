@@ -1,0 +1,52 @@
+id,comment,rating,location,date
+1,"Soundbox device keeps freezing during payment transactions, customers getting frustrated and leaving",1,Mumbai,15-01-2024
+2,"Payment gateway timeout errors happening multiple times per day, losing business",1,Mumbai,16-01-2024
+3,"Transaction fees deducted twice for same payment, need immediate refund",1,Bangalore,17-01-2024
+4,"Refund process taking 15+ days, affecting my cash flow severely",1,Mumbai,18-01-2024
+5,"UPI payments failing randomly, customers complaining about payment experience",2,Bangalore,19-01-2024
+6,"Excellent payment processing speed, customers love the quick transactions",5,Mumbai,20-01-2024
+7,"Seamless integration with my POS system, very satisfied with performance",4,Bangalore,21-01-2024
+8,"Perfect payment solution for my business, highly recommend to other merchants",5,Mumbai,22-01-2024
+9,"Outstanding customer service team, resolved my issues quickly",5,Bangalore,23-01-2024
+10,"Reliable payment processing, no issues in past 3 months",4,Mumbai,24-01-2024
+11,"Soundbox display screen is too small, can't read transaction details clearly",2,Mumbai,25-01-2024
+12,"Button layout is confusing, customers press wrong buttons frequently",1,Bangalore,26-01-2024
+13,"Voice prompts are unclear and too fast, elderly customers struggle",1,Mumbai,27-01-2024
+14,"Need better visual feedback when payment is processing, customers get confused",2,Bangalore,28-01-2024
+15,"Screen brightness too low in daylight, can't see anything outdoors",1,Mumbai,29-01-2024
+16,"Love the new interface update, much more user-friendly now",5,Bangalore,30-01-2024
+17,"Outstanding design improvements, customers find it very easy to use",5,Mumbai,31-01-2024
+18,"Great visual design and intuitive button placement, very satisfied",4,Bangalore,01-02-2024
+19,"Clean interface design, customers appreciate the simplicity",4,Mumbai,02-02-2024
+20,"Excellent user experience, even first-time users understand it quickly",5,Bangalore,03-02-2024
+21,"Soundbox firmware crashes during software updates, device becomes unusable",1,Mumbai,04-02-2024
+22,Device overheating issues causing automatic shutdowns during busy periods,1,Bangalore,05-02-2024
+23,"Network connectivity drops frequently, losing transaction data",1,Mumbai,06-02-2024
+24,"Soundbox takes 30+ seconds to boot up, customers walk away",1,Bangalore,07-02-2024
+25,Hardware failure - buttons stopped working after 2 months,1,Mumbai,08-02-2024
+26,"Speaker volume too low, customers can't hear payment confirmations",1,Bangalore,09-02-2024
+27,"Battery drains too quickly, need to charge multiple times daily",1,Mumbai,10-02-2024
+28,"WiFi connection unstable, affecting payment processing reliability",1,Bangalore,11-02-2024
+29,"Latest firmware update fixed all connectivity issues, working perfectly",4,Mumbai,12-02-2024
+30,Excellent hardware reliability and performance after recent updates,4,Bangalore,13-02-2024
+31,"The interface is confusing and hard to navigate, buttons are too small and poorly labeled",1,Mumbai,14-02-2024
+32,"Menu layout is terrible, can't find basic settings easily, very frustrating user experience",1,Bangalore,15-02-2024
+33,"Screen text is too small to read, need better font size options for older users",1,Mumbai,16-02-2024
+34,"Color scheme is awful, can't distinguish between different buttons and options",1,Bangalore,17-02-2024
+35,"App crashes when trying to access transaction history, interface needs major redesign",1,Mumbai,18-02-2024
+36,"Touch response is poor, have to tap multiple times to select options, very annoying",1,Bangalore,19-02-2024
+37,"No clear visual feedback when buttons are pressed, customers get confused",1,Mumbai,20-02-2024
+38,"Loading screens take forever with no progress indicator, users think device is frozen",1,Bangalore,21-02-2024
+39,"Error messages are cryptic and unhelpful, need user-friendly explanations",1,Mumbai,22-02-2024
+40,"Icons are unclear and don't match their functions, customers keep pressing wrong buttons",1,Bangalore,23-02-2024
+41,the colour on UI are not colour blind friendly..i cant use the app at all,2,Banglore,23-02-2024
+42,"App crashes every time I try to open transaction history, completely unusable",1,Mumbai,24-02-2024
+43,"The new interface is confusing and hard to navigate, customers are complaining constantly",2,Bangalore,25-02-2024
+44,"System performance is extremely slow during peak hours, takes forever to load",1,Mumbai,26-02-2024
+45,"Button placement is terrible, accidentally hit wrong options multiple times",2,Bangalore,27-02-2024
+46,"App keeps crashing when I try to generate QR codes for payments",1,Delhi,28-02-2024
+47,"Customer support is unresponsive, been waiting 3 days for help with refund issue",1,Mumbai,01-03-2024
+48,"Transaction history shows duplicate entries, very confusing for reconciliation",2,Bangalore,02-03-2024
+49,"Payment confirmation messages are delayed by 10-15 minutes, customers think payment failed",2,Delhi,03-03-2024
+50,"Font size is too small for elderly customers, they can't read the text properly",2,Mumbai,04-03-2024
+51,"No accessibility features for visually impaired users, violating basic usability standards",1,Delhi,05-03-2024

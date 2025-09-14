@@ -1,0 +1,164 @@
+# Dashboard v3 - Configuration File
+
+# Application Settings
+app:
+  name: "Dashboard v3 - Intelligent Review Analysis System"
+  version: "1.0.0"
+  description: "AI-powered customer review analysis with role-based authentication"
+  debug: false
+  environment: "production"
+
+# Server Configuration
+server:
+  backend:
+    host: "0.0.0.0"
+    port: 8000
+    reload: true
+    workers: 1
+  frontend:
+    host: "localhost"
+    port: 8501
+    max_upload_size: 200
+
+# Security Settings
+security:
+  jwt:
+    secret_key: "your-secret-key-change-in-production"
+    algorithm: "HS256"
+    access_token_expire_minutes: 30
+  cors:
+    allow_origins:
+      - "http://localhost:8501"
+      - "http://localhost:3000"
+    allow_credentials: true
+    allow_methods: ["*"]
+    allow_headers: ["*"]
+
+# Database/Data Configuration
+data:
+  reviews_file: "Data/reviews.json"
+  auto_analyze_on_startup: true
+  cache_analysis_results: true
+
+# AI/ML Configuration
+ai:
+  google_gemini:
+    model: "gemini-2.0-flash"
+    api_key_env: "api_k"
+  sentiment_analysis:
+    model: "cardiffnlp/twitter-roberta-base-sentiment"
+    max_length: 512
+  embeddings:
+    model: "all-MiniLM-L6-v2"
+    show_progress: false
+  clustering:
+    max_clusters: 20
+    random_state: 42
+    n_init: 10
+
+# User Management
+users:
+  fse_teams:
+    - username: "ux_team"
+      password: "password123"
+      department: "UX Team"
+      type: "FSE Team"
+    - username: "payment_team"
+      password: "password123"
+      department: "Payment Team"
+      type: "FSE Team"
+    - username: "dev_team"
+      password: "password123"
+      department: "Dev Team"
+      type: "FSE Team"
+  
+  area_managers:
+    - username: "mumbai_manager"
+      password: "password123"
+      location: "Mumbai"
+      type: "Area Manager"
+    - username: "bangalore_manager"
+      password: "password123"
+      location: "Bangalore"
+      type: "Area Manager"
+
+# Team Features Configuration
+team_features:
+  ux_team:
+    - "User Research Dashboard"
+    - "Design System Management"
+    - "Prototype Testing Tools"
+    - "User Feedback Analytics"
+    - "A/B Testing Results"
+  
+  payment_team:
+    - "Transaction Monitoring"
+    - "Payment Gateway Analytics"
+    - "Fraud Detection Dashboard"
+    - "Revenue Tracking"
+    - "Refund Management"
+  
+  dev_team:
+    - "Code Repository Access"
+    - "Build Pipeline Status"
+    - "Bug Tracking System"
+    - "Performance Monitoring"
+    - "Deployment Dashboard"
+  
+  managers:
+    - "Team Performance Overview"
+    - "Resource Allocation Dashboard"
+    - "Project Timeline Management"
+    - "Budget Tracking"
+    - "Employee Management"
+    - "Regional Analytics"
+    - "Cross-team Collaboration Tools"
+    - "Strategic Planning Dashboard"
+
+# Analysis Configuration
+analysis:
+  sentiment:
+    categories:
+      - "positive"
+      - "neutral"
+      - "negative"
+  
+  nps:
+    promoters: [4, 5]  # 4-5 star ratings
+    neutrals: [3]      # 3 star ratings
+    detractors: [1, 2] # 1-2 star ratings
+  
+  teams:
+    categories:
+      - "UX"
+      - "Dev"
+      - "Payments"
+      - "Other"
+  
+  clustering:
+    min_clusters: 2
+    top_representatives: 6
+    severity_thresholds:
+      low: [1, 5]      # 1-5 reviews
+      medium: [6, 15]  # 6-15 reviews
+      high: [16, 999]  # 16+ reviews
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/app.log"
+  max_file_size: "10MB"
+  backup_count: 5
+
+# Performance Settings
+performance:
+  cache_timeout: 3600  # 1 hour
+  max_concurrent_requests: 100
+  request_timeout: 30
+  
+# Monitoring
+monitoring:
+  health_check_interval: 60  # seconds
+  metrics_collection: true
+  error_reporting: true
