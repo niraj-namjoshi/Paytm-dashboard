@@ -515,24 +515,31 @@ def incremental_analyze_new_reviews():
         return False
 
 def should_do_full_refresh():
-    """Check if it's time for a full refresh (every 30 minutes)"""
+    """Check if it's time for a full refresh (configurable interval)"""
     if not incremental_cache["full_refresh_time"]:
         return True
     
+    refresh_config = config.get_refresh_config()
+    full_refresh_interval = refresh_config['full_refresh_interval']
+    
     time_since_full = datetime.now() - incremental_cache["full_refresh_time"]
-    return time_since_full.total_seconds() > 1800  # 30 minutes
+    return time_since_full.total_seconds() > full_refresh_interval
 
 def background_refresh_task():
-    """Background task that runs every 2 minutes"""
+    """Background task that runs at configurable intervals"""
+    refresh_config = config.get_refresh_config()
+    incremental_interval = refresh_config['incremental_interval']
+    full_refresh_interval = refresh_config['full_refresh_interval']
+    
     while True:
         try:
-            time.sleep(120)  # Wait 2 minutes
+            time.sleep(incremental_interval)
             
             if should_do_full_refresh():
-                print("🔄 Performing full refresh (30-minute cycle)...")
+                print(f"🔄 Performing full refresh ({full_refresh_interval//60}-minute cycle)...")
                 auto_analyze_reviews_on_startup()
             else:
-                print("🔄 Performing incremental refresh (2-minute cycle)...")
+                print(f"🔄 Performing incremental refresh ({incremental_interval//60}-minute cycle)...")
                 incremental_analyze_new_reviews()
                 
         except Exception as e:
@@ -547,7 +554,10 @@ async def startup_event():
     # Start background refresh task
     refresh_thread = threading.Thread(target=background_refresh_task, daemon=True)
     refresh_thread.start()
-    print("🚀 Background refresh task started (2-minute incremental, 30-minute full)")
+    refresh_config = config.get_refresh_config()
+    incremental_mins = refresh_config['incremental_interval'] // 60
+    full_refresh_mins = refresh_config['full_refresh_interval'] // 60
+    print(f"🚀 Background refresh task started ({incremental_mins}-minute incremental, {full_refresh_mins}-minute full)")
 
 @app.get("/api/reviews/load")
 async def load_and_analyze_reviews(username: str = Depends(verify_token)):
@@ -614,14 +624,15 @@ async def trigger_incremental_refresh(username: str = Depends(verify_token)):
 @app.get("/api/refresh/status")
 async def get_refresh_status(username: str = Depends(verify_token)):
     """Get current refresh status and timing information"""
+    refresh_config = config.get_refresh_config()
     return {
         "last_processed_id": incremental_cache["last_processed_id"],
         "last_processed_date": incremental_cache["last_processed_date"],
         "last_full_refresh": incremental_cache["full_refresh_time"].isoformat() if incremental_cache["full_refresh_time"] else None,
-        "next_full_refresh_in_seconds": 1800 - (datetime.now() - incremental_cache["full_refresh_time"]).total_seconds() if incremental_cache["full_refresh_time"] else 0,
-        "background_refresh_active": True,
-        "refresh_interval_seconds": 120,
-        "full_refresh_interval_seconds": 1800
+        "next_full_refresh_in_seconds": refresh_config['full_refresh_interval'] - (datetime.now() - incremental_cache["full_refresh_time"]).total_seconds() if incremental_cache["full_refresh_time"] else 0,
+        "background_refresh_active": refresh_config['background_enabled'],
+        "refresh_interval_seconds": refresh_config['incremental_interval'],
+        "full_refresh_interval_seconds": refresh_config['full_refresh_interval']
     }
 
 @app.get("/api/data/version")
