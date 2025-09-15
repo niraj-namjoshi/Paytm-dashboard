@@ -165,5 +165,73 @@ class APIClient:
         except requests.exceptions.RequestException:
             return None
 
+    def get_data_version(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get current data version for sync checking"""
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            response = self.session.get(
+                f"{self.base_url}/api/data/version",
+                headers=headers,
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+                
+        except requests.exceptions.RequestException:
+            return None
+
+    def get_location_critical_issues(self, location: str, token: str) -> Optional[Dict[str, Any]]:
+        """Get critical issues for a specific location"""
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            response = self.session.get(
+                f"{self.base_url}/api/locations/{location.lower()}/critical",
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+                
+        except requests.exceptions.RequestException:
+            return None
+
+    def get_refresh_status(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get current refresh status and timing from backend"""
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            response = self.session.get(
+                f"{self.base_url}/api/refresh/status",
+                headers=headers,
+                timeout=5
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+        except requests.exceptions.RequestException:
+            return None
+
+    def trigger_incremental_refresh(self, token: str) -> Optional[Dict[str, Any]]:
+        """Trigger backend incremental analysis of new reviews"""
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            response = self.session.get(
+                f"{self.base_url}/api/reviews/refresh",
+                headers=headers,
+                timeout=30
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+        except requests.exceptions.RequestException:
+            return None
+
 # Global API client instance
 api_client = APIClient()

@@ -1,8 +1,8 @@
-# 🔐 Dashboard v3 - Intelligent Review Analysis System
+# Dashboard v4 - Intelligent Review Analysis System
 
 A comprehensive full-stack application that combines user authentication with AI-powered review analysis. The system automatically processes customer reviews, performs sentiment analysis, clusters issues by team responsibility, and provides detailed analytics through both API endpoints and a user-friendly Streamlit interface.
 
-## 🏗️ Architecture
+## Architecture
 
 **Separated Backend & Frontend Architecture:**
 - **Backend**: FastAPI with JWT authentication + LLM-powered review analysis
@@ -10,10 +10,10 @@ A comprehensive full-stack application that combines user authentication with AI
 - **Data Processing**: Automated sentiment analysis, clustering, and NPS calculation
 - **AI Integration**: Google Gemini for intelligent issue categorization
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-dashboard v3/
+dashboard v4/
 ├── backend/                    # FastAPI Backend
 │   ├── api/
 │   │   ├── LLMs/              # AI Analysis Modules
@@ -50,29 +50,29 @@ dashboard v3/
 └── README.md                  # This file
 ```
 
-## 🚀 Features
+## Features
 
-### 🔐 Authentication System
+### Authentication System
 - **Hierarchical User Access**: FSE Teams & Area Managers
 - **JWT Token Authentication**: Secure API access
 - **Role-based Dashboards**: Different views per user type
 - **Session Management**: Secure login/logout functionality
 
-### 🤖 AI-Powered Review Analysis
+### AI-Powered Review Analysis
 - **Automatic Processing**: Reviews analyzed on server startup
 - **Sentiment Analysis**: RoBERTa-based sentiment classification
 - **Intelligent Clustering**: Groups similar issues automatically
 - **Team Assignment**: AI categorizes issues (UX/Dev/Payments)
 - **NPS Calculation**: Global and location-based Net Promoter Score
 
-### 📊 Analytics & Insights
+### Analytics & Insights
 - **Team-specific Dashboards**: Targeted issue views
 - **Location Analytics**: City-wise sentiment and NPS
 - **Problem Clustering**: Grouped similar customer complaints
 - **Performance Metrics**: Comprehensive KPI tracking
 - **Real-time Data**: Live analysis results
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 - Python 3.8+
@@ -119,7 +119,7 @@ dashboard v3/
    streamlit run app.py --server.port 8501
    ```
 
-## 👥 Demo Credentials
+## Demo Credentials
 
 ### FSE Teams
 - **Username**: `ux_team` | **Password**: `password123` | **Department**: UX Team
@@ -130,7 +130,7 @@ dashboard v3/
 - **Username**: `mumbai_manager` | **Password**: `password123` | **Location**: Mumbai
 - **Username**: `bangalore_manager` | **Password**: `password123` | **Location**: Bangalore
 
-## 🔗 API Endpoints
+## API Endpoints
 
 ### Authentication
 - `GET /` - Health check
@@ -154,7 +154,7 @@ dashboard v3/
 - `GET /api/sentiment/location` - Location sentiment distribution
 - `GET /api/analysis/summary` - Complete analysis overview
 
-## 📈 Data Flow
+## Data Flow
 
 1. **Startup**: Backend automatically loads `Data/reviews.json`
 2. **AI Analysis**: Reviews processed through sentiment analysis & clustering
@@ -163,7 +163,7 @@ dashboard v3/
 5. **Frontend**: Streamlit displays role-specific dashboards
 6. **Real-time**: All endpoints serve live analyzed data
 
-## 🎯 Use Cases
+## Use Cases
 
 ### For FSE Teams
 - View department-specific customer issues
@@ -177,13 +177,8 @@ dashboard v3/
 - Location-based insights
 - Strategic decision support
 
-### For Analysts
-- Comprehensive review analysis
-- NPS tracking across regions
-- Sentiment analysis by location
-- Automated issue categorization
 
-## 🔧 Technical Stack
+## Technical Stack
 
 **Backend:**
 - FastAPI (Web framework)
@@ -203,7 +198,7 @@ dashboard v3/
 - Google Gemini (Issue categorization)
 - Sentence Transformers (Text embeddings)
 
-## 🚦 Getting Started
+## Getting Started
 
 1. **Clone the repository**
 2. **Set up backend** (install deps, configure API key, start server)
@@ -212,7 +207,7 @@ dashboard v3/
 5. **Login** with demo credentials
 6. **Explore** team-specific dashboards and analytics
 
-## 📊 Sample Analysis Output
+## Sample Analysis Output
 
 The system processes 40 customer reviews and provides:
 - **Global NPS**: -62.5 (indicating areas for improvement)
@@ -220,22 +215,3 @@ The system processes 40 customer reviews and provides:
 - **Location Analysis**: City-wise performance metrics
 - **Clustered Issues**: Grouped similar complaints for action
 
-## 🔒 Security Features
-
-- JWT-based authentication
-- Secure password handling
-- CORS protection
-- Environment variable configuration
-- Session state management
-
-## 🎨 UI Features
-
-- Clean, modern interface
-- Role-based dashboards
-- Hidden sidebar for focus
-- Interactive metrics display
-- Real-time data updates
-
----
-
-**Built with ❤️ using FastAPI, Streamlit, and AI-powered analytics**

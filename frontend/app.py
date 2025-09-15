@@ -14,17 +14,16 @@ from pages.dashboard import show_dashboard_page
 st.set_page_config(
     page_title="Login System",
     page_icon="🔐",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
-# Hide sidebar completely with CSS
+# Custom CSS styling
 st.markdown("""
 <style>
+    section[data-testid="stSidebar"] {display: none !important;}
     .css-1d391kg {display: none}
     .css-1rs6os {display: none}
     .css-17eq0hr {display: none}
-    section[data-testid="stSidebar"] {display: none !important;}
     .css-1lcbmhc {display: none}
     .css-1outpf7 {display: none}
     header[data-testid="stHeader"] {display: none !important;}

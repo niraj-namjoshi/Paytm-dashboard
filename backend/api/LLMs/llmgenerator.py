@@ -1,21 +1,23 @@
-import numpy as np
-import re
-import math
-from typing import List, Dict, Any
-from sentence_transformers import SentenceTransformer
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-from kneed import KneeLocator
-from dotenv import load_dotenv
+import google.generativeai as genai
 import os
 import json
-from google import genai
+from typing import List, Dict, Any
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
+from kneed import KneeLocator
+from transformers import pipeline
+from dotenv import load_dotenv
+from config_loader import config
 from . import sentiment_analyzer  # Import the sentiment module
+import re
+
+load_dotenv()
 
 # Load environment variables for the API key
-load_dotenv()
 api_k = os.getenv("api_k")
-client = genai.Client(api_key=api_k)
+genai.configure(api_key=api_k)
 
 # --- Global Models (loaded once) ---
 try:
@@ -33,6 +35,16 @@ def clean_text(text: str) -> str:
     text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+def normalize_location(location: str) -> str:
+    """Normalize location names to handle typos and case sensitivity"""
+    if not location:
+        return ""
+    location = location.strip()
+    # Handle common typos
+    if location.lower() == "banglore":
+        return "Bangalore"
+    return location
 
 def get_embeddings(texts: List[str]) -> np.ndarray:
     """Generates sentence embeddings for a list of texts."""
@@ -116,28 +128,28 @@ def top_representatives(texts: List[str], embeddings: np.ndarray, labels: np.nda
 def generate_cluster_summary(reps_by_cluster: Dict[int, List[str]], cluster_sizes: Dict[int, int]) -> List[Dict[str, Any]]:
     """
     Generates a structured list of problem statements for each cluster using an LLM.
+    Uses only top 1-2 most representative reviews per cluster for efficiency.
     """
     if not reps_by_cluster:
         return []
 
-    # Prepare all clusters data for single LLM call
+    # Prepare all clusters data for single LLM call - limit to top 2 representatives
     all_clusters_data = []
     for cluster_id, reps in reps_by_cluster.items():
+        # Use top 2 representatives if available, otherwise use what we have (minimum 1)
+        top_reps = reps[:2] if len(reps) >= 2 else reps[:1]
         cluster_info = {
             "cluster_id": cluster_id,
             "size": cluster_sizes.get(cluster_id, 0),
-            "representative_reviews": reps[:3]
+            "representative_reviews": top_reps
         }
         all_clusters_data.append(cluster_info)
     
-    prompt = (
-        "Given the following customer reviews, generate one point for each cluster summarizing their main issue: "
-        "The severity should be 'low', 'medium', or 'high' based on review count. "
-        "The team tag should be a single word chosen ONLY from: 'UX', 'Dev', 'Payments'. "
-        "Please provide the output as a JSON array of objects, where each object contains "
-        "'cluster_id', 'cluster_summary', 'team_tag', and 'severity'.\n\n"
-        "All clusters data:\n"
-    )
+    prompts = config.get_prompts()
+    team_categories = config.get_team_categories()
+    team_list = "', '".join([t for t in team_categories if t != 'Other'])
+    
+    prompt = prompts['cluster_summary'].replace("'UX', 'Dev', 'Payments'", f"'{team_list}'")
 
     for cluster_info in all_clusters_data:
         prompt += f"\nCluster ID: {cluster_info['cluster_id']} (Size: {cluster_info['size']}):"
@@ -147,9 +159,8 @@ def generate_cluster_summary(reps_by_cluster: Dict[int, List[str]], cluster_size
     prompt += "\n\nJSON Output:"
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash", contents=prompt
-        )
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content(prompt)
         raw_output = response.text.strip()
         cleaned_output = raw_output.strip('```json').strip('```').strip()
         json_output = json.loads(cleaned_output)
@@ -159,7 +170,7 @@ def generate_cluster_summary(reps_by_cluster: Dict[int, List[str]], cluster_size
         print(f"Error generating or parsing JSON from LLM: {e}")
         return []
 
-def merge_similar_clusters(clusters: List[Dict[str, Any]], similarity_threshold: float = 0.75) -> List[Dict[str, Any]]:
+def merge_similar_clusters(clusters: List[Dict[str, Any]], similarity_threshold) -> List[Dict[str, Any]]:
     """
     Merges clusters that have similar summaries to avoid duplicate issues.
     """
@@ -209,10 +220,13 @@ def merge_similar_clusters(clusters: List[Dict[str, Any]], similarity_threshold:
                 severities.append(clusters[idx].get('severity', 'low'))
                 team_tags.append(clusters[idx].get('team_tag', 'Other'))
             
-            # Determine merged severity based on total count
-            if total_count >= 16:
+            # Determine merged severity based on total count using config thresholds
+            analysis_config = config.get_analysis_config()
+            severity_thresholds = analysis_config['severity_thresholds']
+            
+            if total_count >= severity_thresholds['high'][0]:
                 merged_severity = 'high'
-            elif total_count >= 6:
+            elif total_count >= severity_thresholds['medium'][0]:
                 merged_severity = 'medium'
             else:
                 merged_severity = 'low'
@@ -253,18 +267,8 @@ def generate_team_tags_for_reviews(reviews: List[Dict[str, Any]]) -> Dict[str, s
     for i in range(0, len(reviews), batch_size):
         batch = reviews[i:i + batch_size]
         
-        prompt = (
-            "For each of the following customer reviews, assign a team tag based on the content. "
-            "The team tag should be a single word chosen ONLY from: 'UX', 'Dev', 'Payments', 'Other'. "
-            "Consider:\n"
-            "- UX: UI/design, user experience, interface, layout, visual issues\n"
-            "- Dev: Technical bugs, crashes, performance, loading, functionality\n"
-            "- Payments: Payment processing, billing, transactions, charges\n"
-            "- Other: General feedback not fitting above categories\n\n"
-            "Please provide the output as a JSON array of objects, where each object contains "
-            "'review_index' (0-based index in this batch) and 'team_tag'.\n\n"
-            "Reviews:\n"
-        )
+        prompts = config.get_prompts()
+        prompt = prompts['team_tagging']
 
         for idx, review in enumerate(batch):
             comment = review.get('comment', '')[:200]  # Limit comment length
@@ -273,20 +277,31 @@ def generate_team_tags_for_reviews(reviews: List[Dict[str, Any]]) -> Dict[str, s
         prompt += "\nJSON Output:"
 
         try:
-            response = client.models.generate_content(
-                model="gemini-2.0-flash", contents=prompt
-            )
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content(prompt)
             raw_output = response.text.strip()
             cleaned_output = raw_output.strip('```json').strip('```').strip()
             json_output = json.loads(cleaned_output)
             
             # Map results back to original reviews
-            for result in json_output:
-                review_idx = result.get('review_index', 0)
-                team_tag = result.get('team_tag', 'Other')
-                if 0 <= review_idx < len(batch):
-                    comment = batch[review_idx].get('comment', '')
+            if isinstance(json_output, dict):
+                # If LLM returns a dict mapping comments to tags
+                for comment, team_tag in json_output.items():
                     all_team_tags[comment] = team_tag
+            elif isinstance(json_output, list):
+                # If LLM returns a list of objects with review_index and team_tag
+                for result in json_output:
+                    if isinstance(result, dict):
+                        review_idx = result.get('review_index', 0)
+                        team_tag = result.get('team_tag', 'Other')
+                        if 0 <= review_idx < len(batch):
+                            comment = batch[review_idx].get('comment', '')
+                            all_team_tags[comment] = team_tag
+                    else:
+                        # Handle case where result is a string instead of dict
+                        print(f"Unexpected result format: {result}")
+            else:
+                print(f"Unexpected JSON output format: {type(json_output)}")
                     
         except Exception as e:
             print(f"Error generating team tags for batch {i//batch_size + 1}: {e}")
@@ -308,9 +323,10 @@ def calculate_nps(ratings: List[int]) -> Dict[str, Any]:
     if not ratings:
         return {"nps": 0.0, "promoters": 0, "neutrals": 0, "detractors": 0}
     
-    promoters = sum(1 for r in ratings if r in [4, 5])
-    neutrals = sum(1 for r in ratings if r == 3)
-    detractors = sum(1 for r in ratings if r in [1, 2])
+    analysis_config = config.get_analysis_config()
+    promoters = sum(1 for r in ratings if r in analysis_config['nps_promoters'])
+    neutrals = sum(1 for r in ratings if r in analysis_config['nps_neutrals'])
+    detractors = sum(1 for r in ratings if r in analysis_config['nps_detractors'])
     total = len(ratings)
     
     promoter_percent = (promoters / total) * 100
@@ -368,7 +384,7 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
             "id": original_data.get('id'),
             "comment": sentiment_res['text'],
             "rating": original_data.get('rating'),
-            "location": original_data.get('location'),
+            "location": normalize_location(original_data.get('location')),
             "sentiment": ['negative', 'neutral', 'positive'][sentiment_res['sentiment']],
             "sentiment_scores": sentiment_res['scores']
         }
@@ -391,9 +407,11 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
     
     if negative_reviews_with_sentiment:
         neg_comments = [r['comment'] for r in negative_reviews_with_sentiment]
+        print(f"📊 Total negative/neutral reviews for clustering: {len(neg_comments)}")
+        
         neg_embs = get_embeddings(neg_comments)
         neg_labels, neg_cents = cluster_embeddings(neg_embs, max_clusters=25)
-        neg_reps = top_representatives(neg_comments, neg_embs, neg_labels, neg_cents, top_n=5)
+        neg_reps = top_representatives(neg_comments, neg_embs, neg_labels, neg_cents, top_n=2)
         
         clusters_map = {
             i: [] for i in np.unique(neg_labels)
@@ -406,10 +424,23 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
         }
         
         # 4. Generate cluster summaries and tags using LLM
+        total_representatives = sum(len(reps) for reps in neg_reps.values())
+        num_clusters = len(neg_reps)
+        print(f"🔍 Clustering Results:")
+        print(f"   - Number of clusters formed: {num_clusters}")
+        print(f"   - Total representatives: {total_representatives}")
+        print(f"   - Average reps per cluster: {total_representatives/num_clusters:.1f}")
+        for cluster_id, size in cluster_sizes.items():
+            reps_count = len(neg_reps.get(cluster_id, []))
+            print(f"   - Cluster {cluster_id}: {size} reviews → {reps_count} representatives")
+        
+        print(f"🤖 Sending {total_representatives} representative reviews to LLM for cluster summarization")
         generated_summaries = generate_cluster_summary(neg_reps, cluster_sizes)
         
-        # 4.5. Create initial cluster data
+        # 4.5. Create initial cluster data and assign team tags to all cluster members
         initial_clusters = []
+        cluster_team_tags = {}  # Store team tags by cluster_id
+        
         for summary in generated_summaries:
             # Handle malformed cluster_id values from LLM
             cluster_id_raw = summary.get('cluster_id', 0)
@@ -423,19 +454,26 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
                 cluster_id = 0
             
             team_tag = summary.get('team_tag', 'Other').strip()
+            cluster_team_tags[cluster_id] = team_tag  # Store for propagation
+            
+            # Assign team tag to all reviews in this cluster
+            cluster_reviews = clusters_map.get(cluster_id, [])
+            for review in cluster_reviews:
+                review['team_tag'] = team_tag
             
             cluster_data = {
                 "cluster_summary": summary.get('cluster_summary'),
                 "severity": summary.get('severity'),
                 "team_tag": team_tag,
-                "comments": clusters_map.get(cluster_id, []),
-                "cluster_count": len(clusters_map.get(cluster_id, [])),
+                "comments": cluster_reviews,
+                "cluster_count": len(cluster_reviews),
                 "cluster_id": cluster_id
             }
             initial_clusters.append(cluster_data)
         
         # 4.6. Merge similar clusters to avoid duplicates
-        merged_clusters = merge_similar_clusters(initial_clusters, similarity_threshold=0.7)
+        analysis_config = config.get_analysis_config()
+        merged_clusters = merge_similar_clusters(initial_clusters, similarity_threshold=analysis_config['similarity_threshold'])
         
         # 5. Group merged clusters by team
         for cluster_data in merged_clusters:
@@ -463,23 +501,33 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
             "clusters": clusters
         }
     
-    # 6.1. Calculate complete team-level metrics from ALL reviews using LLM team tags
+    # 6.1. Calculate complete team-level metrics using optimized team tag assignment
     team_sentiment_distribution = {}
     team_nps_breakdown = {}
     
     # Initialize team data structures
-    for team in ["UX", "Dev", "Payments", "Other"]:
+    team_categories = config.get_team_categories()
+    for team in team_categories:
         team_sentiment_distribution[team] = {"positive": 0, "neutral": 0, "negative": 0}
         team_nps_breakdown[team] = []
     
-    # Generate LLM-based team tags for all reviews
-    print("🤖 Generating team tags using LLM for all reviews...")
-    review_team_tags = generate_team_tags_for_reviews(all_reviews_with_sentiment)
+    # Generate LLM-based team tags ONLY for positive reviews (negative/neutral already tagged via clustering)
+    positive_reviews_only = [r for r in all_reviews_with_sentiment if r['sentiment'] == 'positive']
+    print(f"🤖 Generating team tags using LLM for {len(positive_reviews_only)} positive reviews...")
+    print(f"📊 LLM Usage Summary:")
+    print(f"   - Negative/Neutral reviews: {len([r for r in all_reviews_with_sentiment if r['sentiment'] in ['negative', 'neutral']])} (tagged via clustering)")
+    print(f"   - Positive reviews: {len(positive_reviews_only)} (individual LLM tagging)")
+    positive_review_team_tags = generate_team_tags_for_reviews(positive_reviews_only)
     
-    # Assign all reviews to teams based on LLM-generated tags and calculate complete metrics
-    for review in all_reviews_with_sentiment:
+    # Assign team tags to positive reviews
+    for review in positive_reviews_only:
         comment = review.get('comment', '')
-        team = review_team_tags.get(comment, "Other")  # Use LLM-generated team tag
+        team = positive_review_team_tags.get(comment, "Other")
+        review['team_tag'] = team
+    
+    # Calculate metrics for all reviews (negative/neutral already have team_tag from clustering)
+    for review in all_reviews_with_sentiment:
+        team = review.get('team_tag', 'Other')  # Use already assigned team tag
         
         # Update sentiment distribution
         sentiment = review.get('sentiment')
@@ -508,7 +556,7 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
     
     # Initialize location data structures from all reviews
     for review in all_reviews_with_sentiment:
-        location = review.get('location')
+        location = normalize_location(review.get('location'))
         if location and location not in location_sentiment_distribution:
             location_sentiment_distribution[location] = {"positive": 0, "neutral": 0, "negative": 0}
             location_nps_breakdown[location] = []
@@ -516,7 +564,7 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
     
     # Calculate location-based metrics from all reviews
     for review in all_reviews_with_sentiment:
-        location = review.get('location')
+        location = normalize_location(review.get('location'))
         if location:
             sentiment = review.get('sentiment')
             if sentiment in location_sentiment_distribution[location]:
@@ -531,7 +579,7 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
     for team_data in final_team_data.values():
         for cluster in team_data.get("clusters", []):
             for comment in cluster.get("comments", []):
-                location = comment.get('location')
+                location = normalize_location(comment.get('location'))
                 if location and location in problem_clusters_by_location:
                     # Check if this cluster already exists for this location
                     existing_cluster = None
@@ -545,8 +593,8 @@ def analyze_reviews_from_json(json_reviews: List[Dict[str, Any]]) -> Dict[str, A
                         location_cluster = {
                             "cluster_summary": cluster.get("cluster_summary"),
                             "severity": cluster.get("severity"),
-                            "comments": [c for c in cluster.get("comments", []) if c.get('location') == location],
-                            "cluster_count": len([c for c in cluster.get("comments", []) if c.get('location') == location])
+                            "comments": [c for c in cluster.get("comments", []) if normalize_location(c.get('location')) == location],
+                            "cluster_count": len([c for c in cluster.get("comments", []) if normalize_location(c.get('location')) == location])
                         }
                         if location_cluster["cluster_count"] > 0:
                             problem_clusters_by_location[location]["clusters"].append(location_cluster)

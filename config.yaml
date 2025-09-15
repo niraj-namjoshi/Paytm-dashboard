@@ -138,10 +138,11 @@ analysis:
   clustering:
     min_clusters: 2
     top_representatives: 6
+    similarity_threshold: 0.6  # Threshold for merging similar clusters
     severity_thresholds:
-      low: [1, 5]      # 1-5 reviews
-      medium: [6, 15]  # 6-15 reviews
-      high: [16, 999]  # 16+ reviews
+      low: [1, 2]      # 1-5 reviews
+      medium: [2, 4]  # 6-15 reviews
+      high: [4, 999]  # 16+ reviews
 
 # Logging Configuration
 logging:
@@ -150,6 +151,42 @@ logging:
   file: "logs/app.log"
   max_file_size: "10MB"
   backup_count: 5
+
+# Refresh Settings
+refresh:
+  incremental_interval: 120  # 2 minutes in seconds
+  full_refresh_interval: 1800  # 30 minutes in seconds
+  background_enabled: true
+
+# LLM Prompts
+prompts:
+  cluster_summary: |
+    Given the following customer reviews, generate one point for each cluster summarizing their main issue: 
+    The severity should be 'low', 'medium', or 'high' based on effect of of usability of product. 
+    The team tag should be a single word chosen ONLY from: 'UX', 'Dev', 'Payments'. 
+    Please provide the output as a JSON array of objects, where each object contains 
+    'cluster_id', 'cluster_summary', 'team_tag', and 'severity'.
+
+    All clusters data:
+
+  team_tagging: |
+    For each of the following customer reviews, assign a team tag based on the content. 
+    The team tag should be a single word chosen ONLY from: 'UX', 'Dev', 'Payments'. 
+    Consider:
+    - UX: UI/design, user experience, interface, layout, visual issues
+    - Dev: Technical bugs, crashes, performance, loading, functionality
+    - Payments: Transaction issues, payment failures, billing problems
+
+    IMPORTANT: Provide the output as a JSON object where keys are the exact review text and values are the team tags.
+    
+    Required JSON format:
+    {
+      "review text 1": "UX",
+      "review text 2": "Dev",
+      "review text 3": "Payments"
+    }
+
+    Reviews to analyze:
 
 # Performance Settings
 performance:

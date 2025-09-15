@@ -5,15 +5,19 @@ FastAPI Backend for Login System with LLM Analysis
 import json
 import csv
 import os
+import sys
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-import jwt
-import sys
+from pydantic import BaseModel
+import uvicorn
 import threading
 import time
+import jwt
+from config_loader import config
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from api.services.auth_service import AuthService
@@ -22,17 +26,19 @@ from api.models.review import ReviewsAnalysisRequest
 from api.LLMs.llmgenerator import analyze_reviews_from_json, get_embeddings, cluster_embeddings, top_representatives, generate_cluster_summary, calculate_nps, generate_team_tags_for_reviews
 from api.LLMs import sentiment_analyzer
 
-# JWT Configuration
-SECRET_KEY = "your-secret-key-change-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# JWT Configuration from config
+jwt_config = config.get_jwt_config()
+SECRET_KEY = jwt_config['secret_key']
+ALGORITHM = jwt_config['algorithm']
+ACCESS_TOKEN_EXPIRE_MINUTES = jwt_config['expire_minutes']
 
 app = FastAPI(title="Login System API", version="1.0.0")
 
-# CORS middleware to allow Streamlit frontend
+# Configure CORS from config
+server_config = config.get_server_config()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501", "http://localhost:3000"],
+    allow_origins=server_config['cors_origins'],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -161,6 +167,13 @@ incremental_cache = {
 }
 refresh_lock = threading.Lock()
 
+# Data version tracking for frontend sync
+data_version = {
+    "version": 0,
+    "last_updated": None,
+    "update_type": "initial"
+}
+
 def load_reviews_from_csv(since_date=None, since_id=None):
     """Load reviews from the CSV file with optional filtering"""
     try:
@@ -219,11 +232,16 @@ def auto_analyze_reviews_on_startup():
             analysis_results = analyze_reviews_from_json(reviews_data)
             analysis_cache["latest"] = analysis_results
             
-            # Initialize incremental cache
+            # Initialize incremental cache and update data version
             with refresh_lock:
                 incremental_cache["last_processed_date"] = max(r["date"] for r in reviews_data)
                 incremental_cache["last_processed_id"] = max(r["id"] for r in reviews_data)
                 incremental_cache["full_refresh_time"] = datetime.now()
+                
+                # Update data version for frontend sync
+                data_version["version"] += 1
+                data_version["last_updated"] = datetime.now()
+                data_version["update_type"] = "startup_full_analysis"
                 print(f"🔧 Initialized incremental cache:")
                 print(f"   - last_processed_id: {incremental_cache['last_processed_id']}")
                 print(f"   - last_processed_date: {incremental_cache['last_processed_date']}")
@@ -278,11 +296,12 @@ def incremental_analyze_new_reviews():
         ]
         
         # Process negative reviews for clustering
-        new_clusters_by_team = {"UX": [], "Dev": [], "Payments": [], "Other": []}
+        team_categories = config.get_team_categories()
+        new_clusters_by_team = {team: [] for team in team_categories}
         
         if negative_new_reviews:
             # Group negative reviews by team
-            team_negative_reviews = {"UX": [], "Dev": [], "Payments": [], "Other": []}
+            team_negative_reviews = {team: [] for team in team_categories}
             for review in negative_new_reviews:
                 team = review.get('team_tag', 'Other')
                 if team in team_negative_reviews:
@@ -350,7 +369,7 @@ def incremental_analyze_new_reviews():
                         current_analysis["sentiment_distribution"][sentiment] += 1
                 
                 # Collect all ratings by team for NPS recalculation
-                team_ratings = {"UX": [], "Dev": [], "Payments": [], "Other": []}
+                team_ratings = {team: [] for team in team_categories}
                 
                 # Add existing ratings from current analysis (approximate from NPS data)
                 for team, nps_data in current_analysis.get("team_nps_breakdown", {}).items():
@@ -473,13 +492,19 @@ def incremental_analyze_new_reviews():
                             }
                             current_analysis["global_nps_breakdown"] = updated_global_nps
                 
-                # Update tracking info
+                # Update tracking info and data version
                 incremental_cache["last_processed_date"] = max(r["date"] for r in new_reviews)
                 incremental_cache["last_processed_id"] = max(r["id"] for r in new_reviews)
+                
+                # Update data version for frontend sync
+                data_version["version"] += 1
+                data_version["last_updated"] = datetime.now()
+                data_version["update_type"] = "incremental_analysis"
                 
                 print(f"✅ Comprehensive incremental analysis completed for {len(new_reviews)} new reviews")
                 print(f"   - New clusters created: {sum(len(clusters) for clusters in new_clusters_by_team.values())}")
                 print(f"   - Teams updated: {[team for team, clusters in new_clusters_by_team.items() if clusters]}")
+                print(f"   - Data version updated to: {data_version['version']}")
                 return True
         
         return False
@@ -543,9 +568,15 @@ async def load_and_analyze_reviews(username: str = Depends(verify_token)):
         # Cache results and update incremental tracking
         with refresh_lock:
             analysis_cache["latest"] = analysis_results
-            incremental_cache["last_processed_date"] = max(r["date"] for r in reviews_data)
-            incremental_cache["last_processed_id"] = max(r["id"] for r in reviews_data)
-            incremental_cache["full_refresh_time"] = datetime.now()
+            if reviews_data:
+                incremental_cache["last_processed_date"] = max(r["date"] for r in reviews_data)
+                incremental_cache["last_processed_id"] = max(r["id"] for r in reviews_data)
+                incremental_cache["full_refresh_time"] = datetime.now()
+            
+            # Update data version for frontend sync
+            data_version["version"] += 1
+            data_version["last_updated"] = datetime.now()
+            data_version["update_type"] = "manual_full_refresh"
         
         return {
             "message": f"Successfully analyzed {len(reviews_data)} reviews (full refresh)",
@@ -591,6 +622,15 @@ async def get_refresh_status(username: str = Depends(verify_token)):
         "background_refresh_active": True,
         "refresh_interval_seconds": 120,
         "full_refresh_interval_seconds": 1800
+    }
+
+@app.get("/api/data/version")
+async def get_data_version(username: str = Depends(verify_token)):
+    """Get current data version for frontend sync"""
+    return {
+        "version": data_version["version"],
+        "last_updated": data_version["last_updated"].isoformat() if data_version["last_updated"] else None,
+        "update_type": data_version["update_type"]
     }
 
 @app.post("/api/analyze/reviews")
@@ -764,16 +804,11 @@ async def get_nps_scores(username: str = Depends(verify_token)):
         )
     
     results = analysis_cache["latest"]
-    teams_data = results.get("problem_clusters_by_team", {})
     
     nps_data = {
         "global_nps": results.get("global_nps_breakdown", {}),
-        "team_nps": {}
+        "team_nps": results.get("team_nps_breakdown", {})
     }
-    
-    for team_name, team_info in teams_data.items():
-        if team_info and "team_nps_breakdown" in team_info:
-            nps_data["team_nps"][team_name] = team_info["team_nps_breakdown"]
     
     return nps_data
 
@@ -806,6 +841,82 @@ async def get_location_data(location: str, username: str = Depends(verify_token)
         }
     }
 
+@app.get("/api/locations/{location}/critical")
+async def get_location_critical_issues(location: str, username: str = Depends(verify_token)):
+    """Get critical issues for a specific location, sorted by severity and count"""
+    if "latest" not in analysis_cache:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No analysis data available. Please run analysis first."
+        )
+    
+    results = analysis_cache["latest"]
+    
+    # Normalize location name for matching (handle typos and case sensitivity)
+    def normalize_location(loc):
+        if not loc:
+            return ""
+        loc = loc.lower().strip()
+        # Handle common typos
+        if loc == "banglore":
+            return "bangalore"
+        return loc
+    
+    normalized_target = normalize_location(location)
+    
+    # Find matching location data (case-insensitive with typo handling)
+    location_problem_data = {}
+    for loc_key, loc_data in results.get("problem_clusters_by_location", {}).items():
+        if normalize_location(loc_key) == normalized_target:
+            location_problem_data = loc_data
+            break
+    
+    # Get all clusters for this location
+    all_clusters = location_problem_data.get("clusters", [])
+    
+    # Filter and sort critical issues - only high severity
+    critical_issues = []
+    for cluster in all_clusters:
+        severity = cluster.get("severity", "low").lower()
+        cluster_count = cluster.get("cluster_count", 0)
+        
+        # Only consider high severity as critical
+        if severity == "high":
+            critical_issues.append({
+                "cluster_summary": cluster.get("cluster_summary"),
+                "severity": severity,
+                "cluster_count": cluster_count,
+                "comments": cluster.get("comments", [])
+            })
+    
+    # Sort by count (descending)
+    critical_issues.sort(key=lambda x: x["cluster_count"], reverse=True)
+    
+    # Also get location metrics with normalized matching
+    location_sentiment = {}
+    location_nps = {}
+    
+    for loc_key, sentiment_data in results.get("location_sentiment_distribution", {}).items():
+        if normalize_location(loc_key) == normalized_target:
+            location_sentiment = sentiment_data
+            break
+    
+    for loc_key, nps_data in results.get("location_nps_breakdown", {}).items():
+        if normalize_location(loc_key) == normalized_target:
+            location_nps = nps_data
+            break
+    
+    return {
+        "location": location,
+        "total_critical_issues": len(critical_issues),
+        "critical_issues": critical_issues,
+        "location_metrics": {
+            "total_issues": location_problem_data.get("location_count", 0),
+            "sentiment_distribution": location_sentiment,
+            "nps_breakdown": location_nps
+        }
+    }
+
 @app.get("/api/analysis/summary")
 async def get_analysis_summary(username: str = Depends(verify_token)):
     """Get complete analysis summary"""
@@ -818,5 +929,5 @@ async def get_analysis_summary(username: str = Depends(verify_token)):
     return analysis_cache["latest"]
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    server_config = config.get_server_config()
+    uvicorn.run(app, host=server_config['backend_host'], port=server_config['backend_port'])

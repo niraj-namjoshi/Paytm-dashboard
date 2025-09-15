@@ -12,3 +12,4 @@ sentence-transformers
 transformers
 torch
 kneed
+PyYAML==6.0.1

@@ -50,3 +50,9 @@ id,comment,rating,location,date
 49,"Payment confirmation messages are delayed by 10-15 minutes, customers think payment failed",2,Delhi,03-03-2024
 50,"Font size is too small for elderly customers, they can't read the text properly",2,Mumbai,04-03-2024
 51,"No accessibility features for visually impaired users, violating basic usability standards",1,Delhi,05-03-2024
+52,"the colour on UI are not colour blind friendly..i cant use the app at all",2,Banglore,23-02-2024
+53,"App keeps crashing when I try to generate QR codes for payments",1,banglore,28-02-2024
+54,"payment deducted from my acc but didnt reach customer",1,banglore,28-02-2024
+55,"the ux does not have dark mode mking it unbearble to use",2,banglore,28-02-2024
+56,"the app is not responsive ux and takes too long to use",1,banglore,28-02-2024
+57,"the app has some bug it auto logs out without dong anything",2,banglore,28-02,2024

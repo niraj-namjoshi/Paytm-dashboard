@@ -22,6 +22,7 @@ def show_manager_dashboard(dashboard_data):
     location_nps_data = api_client.get_location_nps(st.session_state.token)
     location_sentiment_data = api_client.get_location_sentiment(st.session_state.token)
     team_nps_data = api_client.get_nps_scores(st.session_state.token)
+    critical_issues_data = api_client.get_location_critical_issues(location, st.session_state.token)
     
     if not location_data:
         st.error("Failed to load location analysis data")
@@ -159,6 +160,65 @@ def show_manager_dashboard(dashboard_data):
     
     st.markdown("---")
     
+    # Critical Issues Section - Location-based
+    st.subheader(f"🚨 Critical Issues in {location}")
+    if critical_issues_data:
+        if critical_issues_data and critical_issues_data.get("critical_issues"):
+            critical_issues = critical_issues_data["critical_issues"]
+            
+            st.metric(
+                label="High Severity Issues",
+                value=len(critical_issues),
+                delta=None
+            )
+            
+            # Single centered display for high severity issues only
+            st.markdown(f'''
+            <div style="text-align: center; padding: 20px; background-color: rgba(220, 53, 69, 0.1); border-radius: 8px; border: 1px solid rgba(220, 53, 69, 0.3); margin: 8px 0;">
+                <h2 style="color: #dc3545; margin: 0; font-size: 32px; font-weight: 600;">{len(critical_issues)}</h2>
+                <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0 0; font-size: 14px; font-weight: 500;">High Severity Issues</p>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            # Display critical issues
+            st.markdown("### High Severity Issues Details")
+            for i, issue in enumerate(critical_issues[:5]):  # Show top 5 high severity issues
+                severity = issue.get("severity", "high")
+                count = issue.get("cluster_count", 0)
+                summary = issue.get("cluster_summary", "No summary available")
+                
+                # Color coding for high severity (all issues are high severity now)
+                severity_color = "#dc3545"
+                bg_color = "rgba(220, 53, 69, 0.1)"
+                border_color = "rgba(220, 53, 69, 0.3)"
+                
+                st.markdown(f'''
+                <div style="padding: 15px; background-color: {bg_color}; border-radius: 8px; border: 1px solid {border_color}; margin: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: {severity_color}; font-weight: 600; text-transform: uppercase; font-size: 12px;">
+                            {severity} SEVERITY
+                        </span>
+                        <span style="color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 500;">
+                            {count} reports
+                        </span>
+                    </div>
+                    <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 14px; line-height: 1.4;">
+                        {summary}
+                    </p>
+                </div>
+                ''', unsafe_allow_html=True)
+                
+                # Show sample comments for critical issues
+                if severity == "high" and st.expander(f"View sample comments for issue #{i+1}"):
+                    comments = issue.get("comments", [])[:3]  # Show first 3 comments
+                    for comment in comments:
+                        comment_text = comment.get("comment", "No comment text")
+                        rating = comment.get("rating", "N/A")
+                        st.markdown(f"**Rating: {rating}/5** - {comment_text}")
+        else:
+            st.success(f"✅ No critical issues found in {location}. Great work!")
+    else:
+        st.warning("Unable to load critical issues data")
     
     # Global vs Regional Comparison
     st.markdown("---")

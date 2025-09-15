@@ -1,0 +1,3 @@
+@echo off
+echo Starting Streamlit with auto-reload...
+streamlit run app.py --server.port 8501 --server.fileWatcherType auto --server.runOnSave true

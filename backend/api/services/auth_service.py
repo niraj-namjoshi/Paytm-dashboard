@@ -2,45 +2,21 @@
 Authentication service for user management and validation
 """
 
+from config_loader import config
+
 class AuthService:
     """Service class for authentication and user management"""
     
-    # User credentials database
-    USERS = {
-        # FSE Teams
-        "ux_team": {
-            "password": "password123",
-            "type": "FSE Team",
-            "department": "UX Team"
-        },
-        "payment_team": {
-            "password": "password123",
-            "type": "FSE Team",
-            "department": "Payment Team"
-        },
-        "dev_team": {
-            "password": "password123",
-            "type": "FSE Team",
-            "department": "Dev Team"
-        },
-        
-        # Area Managers
-        "mumbai_manager": {
-            "password": "password123",
-            "type": "Area Manager",
-            "location": "Mumbai"
-        },
-        "bangalore_manager": {
-            "password": "password123",
-            "type": "Area Manager",
-            "location": "Bangalore"
-        }
-    }
+    @classmethod
+    def get_users(cls):
+        """Get users from configuration"""
+        return config.get_users()
     
     @classmethod
     def validate_credentials(cls, username: str, password: str) -> bool:
         """Validate user credentials"""
-        user = cls.USERS.get(username)
+        users = cls.get_users()
+        user = users.get(username)
         if user and user["password"] == password:
             return True
         return False
@@ -48,7 +24,8 @@ class AuthService:
     @classmethod
     def get_user_data(cls, username: str) -> dict:
         """Get user data by username"""
-        user = cls.USERS.get(username)
+        users = cls.get_users()
+        user = users.get(username)
         if user:
             user_data = user.copy()
             user_data.pop("password", None)  # Remove password from response
@@ -58,41 +35,18 @@ class AuthService:
     @classmethod
     def get_department_features(cls, department: str) -> list:
         """Get features available for specific department"""
-        features_map = {
-            "UX Team": [
-                "User Research Dashboard",
-                "Design System Management",
-                "Prototype Testing Tools",
-                "User Feedback Analytics",
-                "A/B Testing Results"
-            ],
-            "Payment Team": [
-                "Transaction Monitoring",
-                "Payment Gateway Analytics",
-                "Fraud Detection Dashboard",
-                "Revenue Tracking",
-                "Refund Management"
-            ],
-            "Dev Team": [
-                "Code Repository Access",
-                "Build Pipeline Status",
-                "Bug Tracking System",
-                "Performance Monitoring",
-                "Deployment Dashboard"
-            ]
+        # Map department names to config keys
+        dept_mapping = {
+            "UX Team": "ux",
+            "Payment Team": "payment", 
+            "Dev Team": "dev"
         }
-        return features_map.get(department, [])
+        team_key = dept_mapping.get(department)
+        if team_key:
+            return config.get_team_features(team_key)
+        return []
     
     @classmethod
     def get_manager_features(cls) -> list:
         """Get features available for area managers"""
-        return [
-            "Team Performance Overview",
-            "Resource Allocation Dashboard",
-            "Project Timeline Management",
-            "Budget Tracking",
-            "Employee Management",
-            "Regional Analytics",
-            "Cross-team Collaboration Tools",
-            "Strategic Planning Dashboard"
-        ]
+        return config.get_team_features('manager')
